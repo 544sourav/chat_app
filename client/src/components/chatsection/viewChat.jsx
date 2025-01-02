@@ -12,7 +12,7 @@ import { useSelector } from 'react-redux';
 import { v4 as uuidv4 } from 'uuid';
 import useSocketEvents from '../../hooks/useuseSocketEvents';
 import { MessageTemplate } from './messageTemplate';
-import { fetchMessages } from '../../service/operations/chatAPI';
+import { fetchMessages, imageupload } from '../../service/operations/chatAPI';
 
 export const ViewChat = () => {
   const { chatId } = useParams();
@@ -31,7 +31,7 @@ export const ViewChat = () => {
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const [fileType, setFileType] = useState(null);
-
+  const [loading,setLoading] = useState(false);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -99,7 +99,7 @@ export const ViewChat = () => {
     if (file) {
       const fileReader = new FileReader();
       setFileType(file.type); // Save the file type
-
+      setFiles(file)
       // File preview
       fileReader.readAsDataURL(file);
       fileReader.onloadend = () => {
@@ -126,38 +126,99 @@ export const ViewChat = () => {
     filereference.current.value = '';
   };
 
-  const submitHandler = (event) => {
-    event.preventDefault();
-    if (!message.trim() && !files) return;
+  // const submitHandler = (event) => {
+  //   event.preventDefault();
+  //   if (!message.trim() && !files) return;
+  //   console.log("file",files);
+  //   console.log("message", message);
+  //   const tempMessage = {
+  //     _id: uuidv4(),
+  //     content: message || '',
+  //     file: files ? previewSource : null,
+  //     sender: {
+  //       _id: user._id,
+  //       name: user.userName,
+  //     },
+  //     createdAt: new Date().toISOString(),
+  //     chat: chatId,
+  //   };
+  //   const formData = new FormData();
+  //   formData.append("image",files);
+  //   const url = imageupload(formData);
+  //   console.log("url",url)
+  //   const messageData = {
+  //     chatId,
+  //     members,
+  //     messages: message || "",
+  //     file: url ? url : null,
+  //   };
+  //   socket.emit(NEW_MESSAGE, messageData);
 
-    const tempMessage = {
-      _id: uuidv4(),
-      content: message || '',
-      file: files ? files.name : null,
-      sender: {
-        _id: user._id,
-        name: user.userName,
-      },
-      createdAt: new Date().toISOString(),
-      chat: chatId,
-    };
+  //   setMessages((prevMessages) => [...prevMessages, tempMessage]);
 
-    const messageData = {
-      chatId,
-      members,
-      messages: message || '',
-      file: files ? files.name : null,
-    };
-    socket.emit(NEW_MESSAGE, messageData);
+  //   setPreviewSource(null);
+  //   setFiles(null);
+  //   setMessage('');
+  //   filereference.current.value = '';
+  //   scrollToBottom();
+  // };
+const submitHandler = async (event) => {
+  event.preventDefault();
 
-    setMessages((prevMessages) => [...prevMessages, tempMessage]);
+  if (!message.trim() && !files) return;
 
-    setPreviewSource(null);
-    setFiles(null);
-    setMessage('');
-    filereference.current.value = '';
-    scrollToBottom();
+  console.log("file", files);
+  console.log("message", message);
+
+  const tempMessage = {
+    _id: uuidv4(),
+    content: message || "",
+    file: files ? previewSource : null,
+    sender: {
+      _id: user._id,
+      name: user.userName,
+    },
+    createdAt: new Date().toISOString(),
+    chat: chatId,
   };
+
+  // Add the temporary message to the UI before uploading
+  setMessages((prevMessages) => [...prevMessages, tempMessage]);
+  setPreviewSource(null);
+  let url = null;
+  if (files) {
+    const formData = new FormData();
+    formData.append("image", files);
+
+    try {
+      url = await imageupload(formData); // Wait for the image upload to complete
+      console.log("Uploaded URL:", url);
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      // Optionally, handle the error (e.g., remove the temp message or show an error message)
+    }
+  }
+
+  const messageData = {
+    chatId,
+    members,
+    messages: message || "",
+    file: url,
+  };
+
+  // Emit the message to the server
+  socket.emit(NEW_MESSAGE, messageData);
+
+  // Reset the input fields
+  setPreviewSource(null);
+  setFiles(null);
+  setMessage("");
+  if (filereference.current) {
+    filereference.current.value = "";
+  }
+
+  scrollToBottom();
+};
 
   return (
     <div className="relative h-[calc(100vh-3.5rem)]">
@@ -189,8 +250,7 @@ export const ViewChat = () => {
         <div ref={messagesEndRef} />
       </div>
       <div className="absolute bottom-0  left-0 w-full border-t border-deepblue-600 bg-deepblue-1000 p-2">
-       
-        {/* {previewSource && (
+        {previewSource && (
           <div className="w-[400px] mb-3 left-0 absolute bottom-14 z-[100]">
             <div
               className="w-full bg-deepblue-700 text-red-500 text-xl flex justify-end h-5"
@@ -199,9 +259,7 @@ export const ViewChat = () => {
               <MdCancel />
             </div>
 
-
             <div className="bg-deepblue-600 flex justify-center items-center">
-              
               {fileType?.startsWith("image/") && (
                 <img
                   src={previewSource}
@@ -210,7 +268,6 @@ export const ViewChat = () => {
                 />
               )}
 
-              
               {fileType?.startsWith("video/") && (
                 <video className="w-[400px] h-[300px] object-contain" controls>
                   <source src={previewSource} type={fileType} />
@@ -218,7 +275,6 @@ export const ViewChat = () => {
                 </video>
               )}
 
-              
               {fileType === "application/pdf" && (
                 <iframe
                   src={previewSource}
@@ -227,7 +283,6 @@ export const ViewChat = () => {
                 />
               )}
 
-             
               {!fileType?.startsWith("image/") &&
                 !fileType?.startsWith("video/") &&
                 fileType !== "application/pdf" && (
@@ -237,22 +292,23 @@ export const ViewChat = () => {
                 )}
             </div>
           </div>
-        )} */}
+        )}
         <form onSubmit={submitHandler}>
           <div className="flex relative items-center">
-            {/* <input
+            <input
               type="file"
               name="media"
               onChange={fileChange}
               ref={filereference}
               className="hidden"
+              accept="image/png, image/jpg, image/jpeg, image/gif"
             />
             <span
               onClick={clickHandler}
               className="cursor-pointer mr-2 text-deepblue-100 text-xl"
             >
               <GrAttachment />
-            </span> */}
+            </span>
             <input
               type="text"
               name="message"
@@ -275,405 +331,4 @@ export const ViewChat = () => {
 };
 
 
-
-// import React, { useEffect, useRef, useState } from 'react';
-// import { GrAttachment } from "react-icons/gr";
-// import { IoSendSharp } from "react-icons/io5";
-// import { MdCancel } from "react-icons/md";
-// import { useSocket } from '../../socket';
-// import { NEW_MESSAGE } from '../../data/event';
-// import { useParams } from 'react-router-dom';
-// import { useSelector } from 'react-redux';
-// import { v4 as uuidv4 } from 'uuid';
-// import useSocketEvents from '../../hooks/useuseSocketEvents';
-// import { MessageTemplate } from './messageTemplate';
-// import { fetchMessages } from '../../service/operations/chatAPI';
-
-// export const ViewChat = () => {
-//   const { chatId } = useParams();
-//   const token = useSelector((state) => state.auth.token);
-//   const members = useSelector((state) => state.chat.members[chatId]);
-//   const [messages, setMessages] = useState([]);
-//   const [page, setPage] = useState(1);
-//   const [message, setMessage] = useState('');
-//   const [files, setFiles] = useState(null);
-//   const [previewSource, setPreviewSource] = useState(null);
-//   const [isLoadMore, setIsLoadMore] = useState(false);
-//   const filereference = useRef(null);
-//   const { socket } = useSocket();
-//   const { user } = useSelector((state) => state.profile);
-//   const messagesEndRef = useRef(null);
-//   const chatContainerRef = useRef(null);
-  
-  
-//   const scrollToBottom = () => {
-//       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-//   };
-//   const loadMore = ()=>{
-//     const currentPage =page;
-//     setPage(currentPage+1);
-//     setIsLoadMore(true);
-//     loadMessages();
-//   }
- 
-//   const loadMessages = async () => {
-//     try {
-//       const fetchedMessages = await fetchMessages(token, chatId, page);
-//       if (fetchedMessages) {
-//         setMessages((prevMessages) =>
-//           isLoadMore ? [...fetchedMessages, ...prevMessages] : fetchedMessages
-//         );
-//         if (isLoadMore) {
-            
-//            chatContainerRef.current.scrollTop;
-//           }
-//            else {
-//             scrollToBottom();
-//           }
-//         }
-
-//         setIsLoadMore(false);
-//     } catch (error) {
-//       console.error("Failed to load messages:", error);
-//     }
-//   };
-// console.log("front end",messages);
-//   useEffect(() => {
-//     loadMessages(); 
-//   }, [chatId, page]);
-
-//   // Handle new messages received from the server
-//   const handleNewMessage = ({ chatId: incomingChatId, message }) => {
-//     if (incomingChatId === chatId) {
-//       setMessages((prevMessages) => [...prevMessages, message]);
-//       scrollToBottom();
-//     }
-//   };
-
-  
-//   useSocketEvents(socket, {
-//     [NEW_MESSAGE]: handleNewMessage,
-//   });
-
-//   const changeHandler = (event) => {
-//     setMessage(event.target.value);
-//   };
-
-//   const fileChange = (event) => {
-//     const result = event.target.files[0];
-//     if (result) {
-//       previewFile(result);
-//       setFiles(result);
-//     }
-//   };
-
-//   const previewFile = (result) => {
-//     const reader = new FileReader();
-//     reader.readAsDataURL(result);
-//     reader.onloadend = () => {
-//       setPreviewSource(reader.result);
-//     };
-//   };
-
-//   const clickHandler = () => {
-//     filereference.current.click();
-//   };
-
-//   const cancelHandler = () => {
-//     setPreviewSource(null);
-//     setFiles(null);
-//     filereference.current.value = '';
-//   };
-
-//   const submitHandler = (event) => {
-//     event.preventDefault();
-//     if (!message.trim() && !files) return;
-
-   
-//     const tempMessage = {
-//       _id: uuidv4(),
-//       content: message || '',
-//       file: files ? files.name : null,
-//       sender: {
-//         _id: user._id,
-//         name: user.userName,
-//       },
-//       createdAt: new Date().toISOString(),
-//       chat: chatId,
-//     };
-
-    
-//     const messageData = {
-//       chatId,
-//       members,
-//       messages: message || '',
-//       file: files ? files.name : null,
-//     };
-//     socket.emit(NEW_MESSAGE, messageData);
-
-    
-//     setMessages((prevMessages) => [...prevMessages, tempMessage]);
-
-
-//     setPreviewSource(null);
-//     setFiles(null);
-//     setMessage('');
-//     filereference.current.value = '';
-//     scrollToBottom();
-//   };
-
-//   return (
-//     <div className="relative h-[calc(100vh-3.5rem)]">
-//       <div className="h-[calc(100vh-8rem)] pb-12 overflow-y-auto" ref={chatContainerRef}>
-//         <div className='text-white flex justify-center' onClick={loadMore}>load more</div>
-//         {messages.map((msg) => (
-//           <MessageTemplate key={msg._id} chat={msg} userId={user._id} />
-//         ))}
-//         <div ref={messagesEndRef} />
-//       </div>
-//       <div className="absolute bottom-0  left-0 w-full border-t border-deepblue-600 bg-deepblue-1000 p-2">
-//         {previewSource && (
-//           <div className="w-[400px] mb-3 left-0 absolute bottom-14 z-[100]">
-//             <div className="w-full bg-deepblue-700 text-red-500 text-xl flex justify-end h-5" onClick={cancelHandler}>
-//               <MdCancel />
-//             </div>
-//             <div className="bg-deepblue-600 flex justify-center items-center">
-//               <img src={previewSource} alt="" className="w-[400px] h-[300px] object-contain" />
-//             </div>
-//           </div>
-//         )}
-//         <form onSubmit={submitHandler}>
-//           <div className="flex relative items-center">
-//             <input type="file" name="media" onChange={fileChange} ref={filereference} className="hidden" />
-//             <span onClick={clickHandler} className="cursor-pointer mr-2 text-deepblue-100 text-xl">
-//               <GrAttachment />
-//             </span>
-//             <input
-//               type="text"
-//               name="message"
-//               value={message}
-//               onChange={changeHandler}
-//               autoComplete="off"
-//               autoCorrect="off"
-//               autoCapitalize="off"
-//               placeholder="Write your message..."
-//               className="w-full text-lg text-gray-400 p-[12px] bg-deepblue-1000 focus:outline-none"
-//             />
-//             <button type="submit" className="text-deepblue-100 text-3xl">
-//               <IoSendSharp />
-//             </button>
-//           </div>
-//         </form>
-//       </div>
-//     </div>
-//   );
-// };
-
-// import React, { useEffect, useRef, useState } from 'react';
-// import { GrAttachment } from "react-icons/gr";
-// import { IoSendSharp } from "react-icons/io5";
-// import { MdCancel } from "react-icons/md";
-// import { useSocket } from '../../socket';
-// import { NEW_MESSAGE } from '../../data/event';
-// import { useParams } from 'react-router-dom';
-// import { useSelector } from 'react-redux';
-// import { v4 as uuidv4 } from 'uuid';
-// import useSocketEvents from '../../hooks/useuseSocketEvents';
-// import { MessageTemplate } from './messageTemplate';
-// import { fetchMessages } from '../../service/operations/chatAPI';
-
-// export const ViewChat = () => {
-//   const { chatId } = useParams();
-//   const token = useSelector((state) => state.auth.token);
-//   const members = useSelector((state) => state.chat.members[chatId]);
-//   const [messages, setMessages] = useState([]);
-//   const [page, setPage] = useState(1); // Current page of messages
-//   const [hasMorePages, setHasMorePages] = useState(true); // Flag for infinite scrolling
-//   const [message, setMessage] = useState('');
-//   const [files, setFiles] = useState(null);
-//   const [previewSource, setPreviewSource] = useState(null);
-//   const filereference = useRef(null);
-//   const { socket } = useSocket();
-//   const { user } = useSelector((state) => state.profile);
-//   const messagesEndRef = useRef(null);
-//   const chatContainerRef = useRef(null);
-//   const isFetchingPrevious = useRef(false); // Flag to prevent multiple fetches at once
-
-//   // Scroll to the bottom of the chat (for new messages)
-//   const scrollToBottom = () => {
-//     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-//   };
-
-//   // Fetch messages from the backend, supporting pagination
-// // Fetch messages from the backend, supporting pagination
-// const loadMessages = async (newPage = page) => {
-//     try {
-//       const fetchedMessages = await fetchMessages(token, chatId, newPage);
-//       // Ensure messages is defined and provide an empty array if not
-//       const messagesToAdd = fetchedMessages || [];
-//       // Append new messages (reverse to maintain chronological order)
-//       setMessages((prevMessages) => [...prevMessages, ...messagesToAdd.reverse()]);
-//       setHasMorePages(fetchedMessages.totalPages > newPage); // Update flag for infinite scroll
-//       setPage(newPage); // Update current page
-//       isFetchingPrevious.current = false; // Reset fetching flag
-//     } catch (error) {
-//       console.error("Failed to load messages:", error);
-//     }
-//   };
-  
-
-//   useEffect(() => {
-//     loadMessages(); // Fetch initial messages on component mount
-//   }, [chatId]);
-
-//   // Handle new messages received from the server, ensuring smooth scrolling
-//   const handleNewMessage = ({ chatId: incomingChatId, message }) => {
-//     if (incomingChatId === chatId) {
-//       setMessages((prevMessages) => [...prevMessages, message]);
-//       scrollToBottom();
-//     }
-//   };
-
-//   // Set up socket event listeners
-//   useSocketEvents(socket, {
-//     [NEW_MESSAGE]: handleNewMessage,
-//   });
-
-//   const changeHandler = (event) => {
-//     setMessage(event.target.value);
-//   };
-
-//   const fileChange = (event) => {
-//     const result = event.target.files[0];
-//     if (result) {
-//       previewFile(result);
-//       setFiles(result);
-//     }
-//   };
-
-//   const previewFile = (result) => {
-//     const reader = new FileReader();
-//     reader.readAsDataURL(result);
-//     reader.onloadend = () => {
-//       setPreviewSource(reader.result);
-//     };
-//   };
-
-//   const clickHandler = () => {
-//     filereference.current.click();
-//   };
-
-//   const cancelHandler = () => {
-//     setPreviewSource(null);
-//     setFiles(null);
-//     filereference.current.value = '';
-//   };
-
-//   const submitHandler = (event) => {
-//     event.preventDefault();
-//     if (!message.trim() && !files) return;
-
-//     // Create temporary message object for immediate display
-//     const tempMessage = {
-//       _id: uuidv4(),
-//       content: message || '',
-//       file: files ? files.name : null,
-//       sender: {
-//         _id: user._id,
-//         name: user.userName,
-//       },
-//       createdAt: new Date().toISOString(),
-//       chat: chatId,
-//     };
-
-//     // Emit message event to server
-//     const messageData = {
-//       chatId,
-//       members,
-//       messages: message || '',
-//       file: files ? files.name : null,
-//     };
-//     socket.emit(NEW_MESSAGE, messageData);
-
-//     // Add the temporary message to the UI
-//     setMessages((prevMessages) => [...prevMessages, tempMessage]);
-
-//     // Reset message input and file input
-//     setPreviewSource(null);
-//     setFiles(null);
-//     setMessage('');
-//     filereference.current.value = '';
-//     scrollToBottom();
-//   };
-
-//   // Handle scrolling to load previous messages
-//   const handleScroll = () => {
-//     if (!chatContainerRef.current) return; // Check if ref is defined
-
-//     const scrollTop = chatContainerRef.current.scrollTop;
-//     const scrollHeight = chatContainerRef.current.scrollHeight;
-//     const clientHeight = chatContainerRef.current.clientHeight;
-
-//     // If scrolled to the top and there are more pages to fetch
-//     if (scrollTop === 0 && hasMorePages && !isFetchingPrevious.current) {
-//       isFetchingPrevious.current = true; // Prevent multiple fetches
-//       loadMessages(page + 1);
-//     }
-//   };
-
-//   useEffect(() => {
-//     const chatContainer = chatContainerRef.current;
-//     if (!chatContainer) return; // Check if ref is defined
-
-//     chatContainer.addEventListener('scroll', handleScroll);
-//     return () => {
-//       chatContainer.removeEventListener('scroll', handleScroll);
-//     };
-//   }, [handleScroll]);
-
-//   return (
-//     <div className="relative h-[calc(100vh-3.5rem)]">
-//       <div className="h-[calc(100vh-8rem)] pb-12 overflow-y-auto" ref={chatContainerRef}>
-//         {messages.map((msg) => (
-//           <MessageTemplate key={msg._id} chat={msg} userId={user._id} />
-//         ))}
-//         <div ref={messagesEndRef} />
-//       </div>
-//       <div className="absolute bottom-0 left-0 w-full border-t border-deepblue-600 bg-deepblue-1000 p-2">
-//         {previewSource && (
-//           <div className="w-[400px] mb-3 left-0 absolute bottom-14 z-[100]">
-//             <div className="w-full bg-deepblue-700 text-red-500 text-xl flex justify-end h-5" onClick={cancelHandler}>
-//               <MdCancel />
-//             </div>
-//             <div className="bg-deepblue-600 flex justify-center items-center">
-//               <img src={previewSource} alt="" className="w-[400px] h-[300px] object-contain" />
-//             </div>
-//           </div>
-//         )}
-//         <form onSubmit={submitHandler}>
-//           <div className="flex relative items-center">
-//             <input type="file" name="media" onChange={fileChange} ref={filereference} className="hidden" />
-//             <span onClick={clickHandler} className="cursor-pointer mr-2 text-deepblue-100 text-xl">
-//               <GrAttachment />
-//             </span>
-//             <input
-//               type="text"
-//               name="message"
-//               value={message}
-//               onChange={changeHandler}
-//               autoComplete="off"
-//               autoCorrect="off"
-//               autoCapitalize="off"
-//               placeholder="Write your message..."
-//               className="w-full text-lg text-gray-400 p-[12px] bg-deepblue-1000 focus:outline-none"
-//             />
-//             <button type="submit" className="text-deepblue-100 text-3xl">
-//               <IoSendSharp />
-//             </button>
-//           </div>
-//         </form>
-//       </div>
-//     </div>
-//   );
-// };
 

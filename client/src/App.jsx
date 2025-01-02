@@ -17,7 +17,7 @@ function App() {
     <div className='w-screen min-h-screen bg-deepblue-900 flex flex-col font-inter'>
       <Navbar />
       <Routes>
-        <Route path='/' element={<OpenRoute><Home /></OpenRoute>} />
+        <Route path='/' element={<OpenRoute><Home/></OpenRoute>} />
         <Route path='/signup' element={<OpenRoute><Signup /></OpenRoute>} />
         <Route path='verify-email' element={<OpenRoute><VerifyEmail /></OpenRoute>} />
         
@@ -27,7 +27,7 @@ function App() {
           }
         >
             <Route path='creategroup' element={<Group/>} />
-            <Route path='find' element={<Find />} />
+            <Route path='find' element={<Find/>} />
             <Route path='/chats' element={<Chats />}>
               <Route path='/chats/:chatId' element={<ViewChat />} />
             </Route>

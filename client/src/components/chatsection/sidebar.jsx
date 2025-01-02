@@ -11,7 +11,7 @@ export const Sidebar = () => {
   const { token } = useSelector((state) => state.auth);
   const location = useLocation();
   const dispatch = useDispatch();
-
+  const { user } = useSelector((state) => state.profile);
   const navigate = useNavigate();
 
   const getchats = async () => {
@@ -82,7 +82,11 @@ export const Sidebar = () => {
                 />
                 <div className="flex-1">
                   <p className="text-lg font-medium break-words">
-                    {chat.chatName}
+                    {chat.isGroupChat
+                      ? chat.chatName
+                      : chat.chatName
+                          .split("-")
+                          .find((name) => name !== user.userName)}
                   </p>
                 </div>
               </div>

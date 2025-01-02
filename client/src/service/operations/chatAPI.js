@@ -8,7 +8,8 @@ const {
     GETMYCHATS_API,
     GETCHATMESSAGES_API,
     GETMYFRIEND_API,
-    CREATGROUP_API
+    CREATGROUP_API,
+    UPLOADIMAGE_API
     }=chatendpoints
 
 export const fetchMyChats=async(token,dispatch,navigate)=>{
@@ -97,4 +98,29 @@ export const createGroup=async(token,name,members)=>{
     }
     toast.dismiss(toastId)
 
+}
+export const imageupload = async(formData)=>{
+    const toastId = toast.loading("sending file");
+    try{
+        console.log("working1")
+        const response = await apiConnector("POST", UPLOADIMAGE_API, formData, {
+          "Content-Type": "multipart/form-data",
+        });
+        console.log("working2");
+        if (!response.data.success) {
+          throw new Error(response.data.message);
+        }
+        console.log("working3");
+        toast.dismiss(toastId);
+        return response.data.url;
+    }
+    catch(error){
+        console.log("error",error)
+                const errorMessage =
+                  error.response?.data?.message ||
+                  error.message ||
+                  "An unexpected error occurred";
+                toast.error(errorMessage);
+    }
+     toast.dismiss(toastId);
 }

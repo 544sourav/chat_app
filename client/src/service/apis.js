@@ -13,7 +13,8 @@ export const chatendpoints = {
     CREATGROUP_API:BASE_URL+"/chats/creategroup",
     GETMYCHATS_API:BASE_URL+"/chats/fetchchats",
     GETMYFRIEND_API:BASE_URL+"/chats/myfriends",
-    GETCHATMESSAGES_API:BASE_URL+"/chats/message/:id"
+    GETCHATMESSAGES_API:BASE_URL+"/chats/message/:id",
+    UPLOADIMAGE_API:BASE_URL+"/chats/upload"
 }
 export const userendpoints = {
     SEARCHUSER_API :BASE_URL+"/user/search",
