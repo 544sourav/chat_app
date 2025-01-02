@@ -2,7 +2,7 @@ const { ALERT, REFETCH_CHATS } = require('../constants/events');
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 const User = require('../models/User');
-const { emitEvent } = require('../utils/features');
+const { emitEvent, uploadFileToCloudinary } = require('../utils/features');
 
 exports.newGroupChat=async(req,res)=>{
     try{
@@ -170,5 +170,30 @@ exports.getMessages= async(req,res)=>{
                 success:false,
                 message:"server error"
             })
+    }
+}
+exports.imageupload = async(req,res)=>{
+    try{
+        const upload = req.files.image;
+        console.log("upload",upload);
+        if(!upload){
+            return res.status(404).json({
+                success:false,
+                message:"no image present"
+            })
+        }
+        const imageurl  = await uploadFileToCloudinary(upload,process.env.FOLDER_NAME,1000,1000);
+        return res.status(200).json({
+            success:true,
+            message:"imageuploaded",
+            url:imageurl.secure_url
+        })
+    }
+    catch(error){
+        console.log(error);
+        return res.status(404).json({
+            success:false,
+            message:"unable to upload image"
+        })
     }
 }

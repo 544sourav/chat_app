@@ -16,6 +16,9 @@ const Message = require('./models/Message');
 const { getSockets } = require('./lib/helpers');
 const { onlineUsers, userSocketIDs } = require('./socket/userStatus');
 const { v4: uuid } =require("uuid") ;
+const { uploadFileToCloudinary } = require('./utils/features');
+const fileUpload = require("express-fileupload");
+const cloudinary = require("./config/cloudinary");
 
 dotenv.config();
 const PORT = process.env.PORT || 5000;
@@ -44,7 +47,14 @@ app.use(cors({
   origin: process.env.CLIENT_URL,
   credentials: true,
 }));
-
+app.use(
+  fileUpload({
+    useTempFiles: true,
+    tempFileDir: "/tmp",
+  })
+);
+//cloudinary connection
+cloudinary.cloudinaryConnect();
 app.use('/api/v1/auth', AuthRoutes);
 app.use('/api/v1/chats', chatRoutes);
 app.use('/api/v1/user', userRoutes);
@@ -74,11 +84,12 @@ io.on('connection', (socket) => {
     return socket.disconnect();
   }
   userSocketIDs.set(user.id.toString(), socket.id);
-
+  
   // Handle various socket events
-  socket.on(NEW_MESSAGE, async ({ chatId, members, messages }) => {
+  socket.on(NEW_MESSAGE, async ({ chatId, members, messages,file }) => {
     const messageForRealTime = {
       content: messages,
+      file:file,
       _id: uuid(),
       sender: {
         _id: user.id,
@@ -89,6 +100,7 @@ io.on('connection', (socket) => {
     };
     const messageForDB = {
       content: messages,
+      file:file,
       sender: user.id,
       chat: chatId,
     };
@@ -106,6 +118,66 @@ io.on('connection', (socket) => {
       console.log('error', error);
     }
   });
+  // socket.on(NEW_MESSAGE, async ({ chatId, members, messages, file }) => {
+  //   const messageForRealTime = {
+  //     content: messages,
+  //     _id: uuid(),
+  //     sender: {
+  //       _id: user.id,
+  //       name: user.userName,
+  //     },
+  //     chat: chatId,
+  //     createdAt: new Date().toISOString(),
+  //     file: null, // Add a field for the image URL
+  //   };
+
+  //   const messageForDB = {
+  //     content: messages,
+  //     sender: user.id,
+  //     chat: chatId,
+  //     file: null, // Add a field for the image URL
+  //   };
+
+  //   // Upload file to Cloudinary if file is not null
+  //   if (file) {
+  //     try {
+  //       console.log("file",file)
+  //       const uploadedFile = await uploadFileToCloudinary(
+  //         file,
+  //         "chitchat"
+  //       );
+  //       const imageUrl = uploadedFile.secure_url;
+  //       console.log("imageurl",imageUrl)
+  //       // Update the message objects with the Cloudinary URL
+  //       messageForRealTime.imageUrl = imageUrl;
+  //       messageForDB.file = imageUrl;
+  //     } catch (error) {
+  //       console.log("Error uploading file to Cloudinary:", error);
+  //     }
+  //   }
+
+  //   // Get the socket IDs for the members
+  //   const membersSocket = getSockets(members);
+  //   console.log("membersSocket", membersSocket);
+
+  //   // Emit the message and alert to members if they are connected
+  //   if (membersSocket.length > 0) {
+  //     console.log("membersSocket", membersSocket);
+  //     io.to(membersSocket).emit(NEW_MESSAGE, {
+  //       chatId,
+  //       message: messageForRealTime,
+  //     });
+  //     io.to(membersSocket).emit(NEW_MESSAGE_ALERT, { chatId });
+  //   }
+
+  //   // Save the message in the database
+  //   try {
+  //     await Message.create(messageForDB);
+  //   } catch (error) {
+  //     console.log("Error saving message to DB:", error);
+  //   }
+  // });
+
 
  
 

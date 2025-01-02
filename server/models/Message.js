@@ -12,17 +12,18 @@ const mesgSchema = new mongoose.Schema({
             required:true
         },
         content: String,
-        attachments:[
-            {
-            public_id:{
-                type:String,
-                required:true,
-            },
-            url:{
-                type:String,
-                required:true,
-            }}
-        ]
+        file:String,
+        // attachments:[
+        //     {
+        //     public_id:{
+        //         type:String,
+        //         required:true,
+        //     },
+        //     url:{
+        //         type:String,
+        //         required:true,
+        //     }}
+        // ]
 
 },
 {
